@@ -71,19 +71,37 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
   //-----------------------------------------------------
   // define event selection (store in TCut sel)
   //-----------------------------------------------------
+    TCut rho("rhovor>0 && rhovor<40");
+    TCut filters("isdata==0 || (csc==0 && hbhe==1 && hcallaser==1 && ecaltp==1 && trkfail==1 && eebadsc==1 && hbhenew==1)");
+    TCut goodlep("ngoodlep > 0 && abs( pflep1.Pt() - lep1.Pt() ) < 10.0 && abs(isopf1 * lep1.Pt() ) < 5.0");
+    TCut el("leptype==0 && abs(lep1->Eta())<1.4442 && lep1->Pt()>30.0 && eoverpin < 4.0 && (isdata==0 || ele27wp80==1)");
+    TCut mu("leptype==1 && abs(lep1->Eta())<2.1 && lep1->Pt()>25.0 && (isdata==0 || isomu24==1)");
+    TCut njets4("mini_njets >= 4");
+    TCut btag1("mini_nb >= 1");
+    TCut passisotrk("mini_passisotrk==1");
+    TCut passtauveto("mini_passtauveto==1");
+    TCut met100("t1metphicorr > 100");
+    TCut mt120("t1metphicorrmt > 120");
 
-  TCut njets4("mini_njets>=4");
-  TCut met100("mini_met>=100");
-  TCut mt120("mini_mt>=120");
-  TCut nb1("mini_nb>=1");
-  TCut isotrk("mini_passisotrk==1");
-  TCut lep_pt30("mini_nlep>=1 && mini_lep1pt>30.0");
-  TCut sig("mini_sig==1");
-   
-  TCut  sel0  = njets4 + met100 + mt120 + nb1 + isotrk + lep_pt30 + sig;
 
-  cout << "Using selection      : " << sel0.GetTitle() << endl;
-  cout << "Doing signal point   : " << train_region       << endl;
+    TCut sel;
+    sel += rho;
+    sel += filters;
+    sel += goodlep;
+    sel += (el||mu);
+    sel += njets4;
+    sel += btag1;
+    sel += passisotrk;
+    sel += met100;
+    sel += mt120;
+
+
+    TCut mlspGT0("ml > 0"); // The LSP = 0 is bad for madgraph.
+    TCut selSignal = sel + mlspGT0;
+    TCut selBackground = sel + passtauveto;
+
+    cout << "Using selection      : " << sel.GetTitle() << endl;
+    cout << "Doing signal point   : " << train_region       << endl;
 
   //-----------------------------------------------------
   // choose which variables to include in MVA training
@@ -91,12 +109,25 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
   
   std::map<std::string,int> mvaVar;
   mvaVar[ "met" ]			= 1;
-  mvaVar[ "lep1pt" ]  	    = 0;
   mvaVar[ "mt2w" ]	  		= 1;
   mvaVar[ "htratiom" ]	    = 1;
   mvaVar[ "chi2" ]	        = 1;
+
+  if ( train_region == 5 || signal_name.Contains("T2bw"))
+      mvaVar[ "chi2" ]	    = 0;
+
   mvaVar[ "dphimjmin" ]		= 1;
-  mvaVar[ "pt_b" ]			= 0;
+
+  if ( train_region == 5 || signal_name.Contains("T2bw"))
+      mvaVar[ "pt_b" ]		= 1;
+
+  if ( signal_name.Contains("T2bw"))
+      mvaVar[ "dRleptB1" ]  = 1;
+
+  if ( train_region == 4 && signal_name.Contains("T2bw")  )
+      mvaVar[ "lep1pt" ]  	= 1;
+
+
   mvaVar[ "nb" ]			= 0;
   mvaVar[ "pt_J1" ]			= 0;
   mvaVar[ "pt_J2" ]			= 0;
@@ -133,9 +164,9 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
   cout << "Background trees: " << endl;
   int n_backgrounds = 8;
 
-  TString backgrounds[] = {"ttdl_powheg", "ttsl_powheg", "w1to4jets", "tW_lep", "triboson", "diboson", "ttV", "DY1to4Jtot" };
+  TString backgrounds[] = {"ttdl_lmg", "ttsl_lmg", "w1to4jets", "tWall_lep", "triboson", "diboson", "ttV", "DY1to4Jtot" };
 
-  TString bkgPath = "/nfs-3/userdata/stop/Train/V00-02-18__V00-03-00_4jetsMET100_bkg/";
+  TString bkgPath = "/nfs-3/userdata/stop/Train/V00-02-20__V00-03-01_4jetsMET100MT120_bkg/";
 
   TChain* chBackground = new TChain("t");
  
@@ -154,8 +185,9 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
   TString s_x_parameter = "";
   s_x_parameter = Form("%.2f",x_parameter);
 
-  TString signalPath = "/nfs-3/userdata/stop/Train/";
-  TString signalVersion = "V00-02-18__V00-03-00_4jetsMET100_";
+  TString signalPath = "/nfs-7/userdata/stop/Train/";
+//  TString signalVersion = "cms2V05-03-26_stoplooperV00-02-25_";
+  TString signalVersion = "V00-02-25__V00-03-11__BDT008__4jetsMET120_";
 
   TChain *chSignal = new TChain("t");
 
@@ -356,6 +388,7 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
    if( mvaVar[ "nb"            ]  == 1 ) factory->AddVariable( "mini_nb"  ,       "P_T(b) GeV"   , 'F' );
    if( mvaVar[ "pt_J1"          ]  == 1 ) factory->AddVariable( "pt_J1"  ,       "P_T(J1) GeV"   , 'F' );
    if( mvaVar[ "pt_J2"          ]  == 1 ) factory->AddVariable( "pt_J2"  ,       "P_T(J2) GeV"   , 'F' );
+   if( mvaVar[ "dRleptB1"      ]  == 1 ) factory->AddVariable( "mini_dRleptB1"  ,       ""   , 'F' );
    
    /*
    if( doMultipleOutputs ){
@@ -417,10 +450,10 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
 //   factory->AddSignalTree    ( chSignal,     signalWeight     );
 //   factory->AddBackgroundTree( chBackground, backgroundWeight );
 
-   factory->AddTree(chSignal, "Signal", signalWeight, sel0+"mini_rand < 0.5", "train");
-   factory->AddTree(chSignal, "Signal", signalWeight, sel0+"mini_rand >= 0.5", "test");
-   factory->AddTree(chBackground, "Background", backgroundWeight, sel0+"mini_rand < 0.5", "train");
-   factory->AddTree(chBackground, "Background", backgroundWeight, sel0+"mini_rand >= 0.5", "test");
+   factory->AddTree(chSignal, "Signal", signalWeight, selSignal+"(event%2)==1", "train");
+   factory->AddTree(chSignal, "Signal", signalWeight, selSignal+"(event%2)==0", "test");
+   factory->AddTree(chBackground, "Background", backgroundWeight, selBackground+"(event%2)==1", "train");
+   factory->AddTree(chBackground, "Background", backgroundWeight, selBackground+"(event%2)==0", "test");
    
    // To give different trees for training and testing, do as follows:
    //factory->AddSignalTree( signalTrainingTree, signalWeight, "Training" );
@@ -465,7 +498,8 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
    // --- end of tree registration 
    
    // Set individual event weights (the variables must exist in the original TTree)
-   factory->SetSignalWeightExpression    ("mini_weight");
+//   factory->SetSignalWeightExpression    ("mini_weight");
+///   factory->SetSignalWeightExpression    ("(mini_weight/xsecsusy)");
    factory->SetBackgroundWeightExpression("mini_weight");
 
    /*
@@ -494,8 +528,8 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
    */
 
    // Apply additional cuts on the signal and background samples (can be different)
-   TCut mycuts = sel0; // for example: TCut mycuts = "abs(var1)<0.5 && abs(var2-0.5)<1";
-   TCut mycutb = sel0; // for example: TCut mycutb = "abs(var1)<0.5";
+//   TCut mycuts = sel0; // for example: TCut mycuts = "abs(var1)<0.5 && abs(var2-0.5)<1";
+//   TCut mycutb = sel0; // for example: TCut mycutb = "abs(var1)<0.5";
 
    // Tell the factory how to use the training and testing events
    //
@@ -686,7 +720,7 @@ void TMVA_stop( TString signal_name = "T2tt", int train_region = 1, float x_para
 
    if (Use["BDT1"])  // Adaptive Boost
       factory->BookMethod( TMVA::Types::kBDT, "BDT1",
-                             "!H:!V:NTrees=200:nEventsMin=300:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:SeparationType=GiniIndex:nCuts=4:PruneMethod=NoPruning" );
+                           "!H:!V:NTrees=850:nEventsMin=300:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:SeparationType=GiniIndex:nCuts=4:PruneMethod=NoPruning" );
 
    if (Use["BDTB"]) // Bagging
       factory->BookMethod( TMVA::Types::kBDT, "BDTB",

@@ -285,8 +285,8 @@ namespace TMVAGlob {
 	   cout << "--- printing all files as pdf's, to turn off go to tmvaglob.C L285"       << endl;
 	   cout << "--- --------------------------------------------------------------------" << endl;
 	   // c->Print(epsName);
-	   c->Print(pngName);
-	   //c->Print(pdfName);
+	   //c->Print(pngName);
+	   c->Print(pdfName);
 	   // c->Print(gifName);
 	 }
          // else {
